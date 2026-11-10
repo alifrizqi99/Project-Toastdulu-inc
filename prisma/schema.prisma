@@ -1,0 +1,185 @@
+// Prisma schema for TOAST,inc — Inventory & Finance Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  email        String        @unique
+  password     String
+  role         Role          @default(ADMIN)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  purchases    Purchase[]
+  usages       Usage[]
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+model Supplier {
+  id        Int        @id @default(autoincrement())
+  name      String
+  phone     String?
+  email     String?
+  address   String?    @db.Text
+  rating    Float      @default(5.0) // 1.0 - 5.0 reliability score
+  notes     String?    @db.Text
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  purchases Purchase[]
+
+  @@map("suppliers")
+}
+
+model Category {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?      @db.Text
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  ingredients Ingredient[]
+
+  @@map("categories")
+}
+
+model Unit {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique // e.g. Kilogram, Gram, Liter, Pack, Pcs, Lembar
+  symbol      String       // e.g. kg, g, L, pack, pcs, lbr
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  ingredients Ingredient[]
+
+  @@map("units")
+}
+
+model Ingredient {
+  id           Int              @id @default(autoincrement())
+  name         String
+  categoryId   Int
+  unitId       Int
+  currentStock Float            @default(0)
+  minStock     Float            @default(0)
+  pricePerUnit Float            @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  category     Category         @relation(fields: [categoryId], references: [id])
+  unit         Unit             @relation(fields: [unitId], references: [id])
+  purchaseDetails PurchaseDetail[]
+  usageDetails    UsageDetail[]
+
+  @@map("ingredients")
+}
+
+model Purchase {
+  id            Int              @id @default(autoincrement())
+  invoiceNumber String           @unique
+  purchaseDate  DateTime         @default(now())
+  supplierId    Int
+  userId        Int?
+  totalAmount   Float            @default(0)
+  notes         String?          @db.Text
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  supplier      Supplier         @relation(fields: [supplierId], references: [id])
+  user          User?            @relation(fields: [userId], references: [id])
+  details       PurchaseDetail[]
+  transaction   Transaction?
+
+  @@map("purchases")
+}
+
+model PurchaseDetail {
+  id           Int        @id @default(autoincrement())
+  purchaseId   Int
+  ingredientId Int
+  quantity     Float
+  unitPrice    Float
+  subtotal     Float
+
+  purchase     Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@map("purchase_details")
+}
+
+model Usage {
+  id          Int           @id @default(autoincrement())
+  usageNumber String        @unique
+  usageDate   DateTime      @default(now())
+  userId      Int?
+  notes       String?       @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user        User?         @relation(fields: [userId], references: [id])
+  details     UsageDetail[]
+
+  @@map("usages")
+}
+
+model UsageDetail {
+  id           Int        @id @default(autoincrement())
+  usageId      Int
+  ingredientId Int
+  quantity     Float
+
+  usage        Usage      @relation(fields: [usageId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@map("usage_details")
+}
+
+model Transaction {
+  id                Int             @id @default(autoincrement())
+  transactionNumber String          @unique
+  type              TransactionType // INCOME, EXPENSE
+  category          String          // PEMBELIAN_BAHAN, PENJUALAN_SANDWICH, OPERASIONAL, GAJI, LAINNYA
+  amount            Float
+  transactionDate   DateTime        @default(now())
+  description       String?         @db.Text
+  purchaseId        Int?            @unique
+  userId            Int?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  purchase          Purchase?       @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  user              User?           @relation(fields: [userId], references: [id])
+
+  @@map("transactions")
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
